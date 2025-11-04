@@ -1,6 +1,6 @@
 option(USE_SDL "Use SDL" OFF)
 option(BUILD_CPP_LIB "Build C++ Shared Library" ON)
-option(BUILD_TEST_EXEC "Build C++ Shared Library" OFF)
+option(BUILD_TEST_EXEC "Build test binary" OFF)
 option(BUILD_C_LIB "Build C Shared Library" OFF)
 
 
