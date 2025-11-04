@@ -3,7 +3,7 @@ name: Python package
 
 on:
   push:
-    branches: [ production ]
+    branches: [production]
 
 jobs:
   build_linux:
@@ -11,58 +11,98 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10']
+        python-version: ["3.10"]
 
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@v3
 
-    - name: Install cibuildwheel
-      run: python3 -m pip install cibuildwheel==2.11.2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Build wheels
-      run: python3 -m cibuildwheel --output-dir wheelhouse
-      env:
-        CIBW_SKIP: "*musllinux* pp* *-manylinux_i686"
-        CIBW_BUILD_VERBOSITY: 1
+      - name: Install cibuildwheel
+        run: python3 -m pip install cibuildwheel==2.11.2
 
-    - uses: actions/upload-artifact@v3
-      with:
-        path: ./wheelhouse/*.whl
+      - name: Build wheels
+        run: python3 -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_SKIP: "*musllinux* pp* *-manylinux_i686"
+          CIBW_BUILD_VERBOSITY: 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          path: ./wheelhouse/*.whl
 
   build_macos:
     name: Macos Wheels
     runs-on: macos-11
     strategy:
       matrix:
-        python-version: ['3.10']
+        python-version: ["3.10"]
 
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@v3
 
-    - name: Install cibuildwheel
-      run: python3 -m pip install cibuildwheel==2.11.2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Build wheels
-      run: python3 -m cibuildwheel --output-dir wheelhouse
-      env:
-        # Apple M1 and Intel
-        CIBW_ARCHS_MACOS: x86_64 arm64
-        CIBW_SKIP: "pp*"
-        CIBW_BUILD_VERBOSITY: 1
+      - name: Install cibuildwheel
+        run: python3 -m pip install cibuildwheel==2.11.2
 
-    - uses: actions/upload-artifact@v3
-      with:
-        path: ./wheelhouse/*.whl
+      - name: Build wheels
+        run: python3 -m cibuildwheel --output-dir wheelhouse
+        env:
+          # Apple M1 and Intel
+          CIBW_ARCHS_MACOS: x86_64 arm64
+          CIBW_SKIP: "pp*"
+          CIBW_BUILD_VERBOSITY: 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          path: ./wheelhouse/*.whl
+
+  build_windows:
+    name: Windows Wheels
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: "a42af01b72c28a8e1d7b48107b33e4f286a55ef6"
+          runVcpkgInstall: true
+
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.11.2
+
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_SKIP: "pp* *-win32"
+          CIBW_BUILD_VERBOSITY: 1
+          VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+          CIBW_ENVIRONMENT_WINDOWS: "VCPKG_ROOT=${{ github.workspace }}\\vcpkg"
+          CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel} --add-path ${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\bin"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build Source Distribution
@@ -73,12 +113,12 @@ jobs:
       - name: Build sdist
         run: pipx run build --sdist
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           path: dist/*.tar.gz
 
   upload_pypi:
-    needs: [build_linux, build_macos, build_sdist]
+    needs: [build_linux, build_macos, build_windows, build_sdist]
     runs-on: ubuntu-latest
 
     # upload to PyPI on every tag starting with 'v'
@@ -96,7 +136,7 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@v1.5.0
         with:
           user: ${{ secrets.PYPI_USER }}
-          password: ${{ secrets.PYPI_PASSWORD }} 
+          password: ${{ secrets.PYPI_PASSWORD }}
           # Recommend to upload to PyPI test for the first run
           # repository_url: https://test.pypi.org/legacy/
           skip_existing: true
